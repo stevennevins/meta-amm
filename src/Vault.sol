@@ -17,9 +17,6 @@ contract Vault is ERC1155 {
 
     mapping(uint256 => Pair) public pairs; /// pairId => Pair
 
-    /// TODO: Need update reserves
-    /// maybe just use supports interface to determine how to check balances and TransferLib.transfer
-
     function createPair(
         address token0,
         uint256 token0Id,
@@ -49,11 +46,13 @@ contract Vault is ERC1155 {
         uint96 minK,
         bytes calldata
     ) external returns (uint96 k) {
-        Pair memory pair = pairs[pairId];
+        Pair storage pair = pairs[pairId];
 
         k = pair.invariant.addLiquidity(pair, token0Amount, token1Amount);
-        _mint(to, pairId, k, "");
+        pair.reserve0 += token0Amount;
+        pair.reserve1 += token1Amount;
 
+        _mint(to, pairId, k, "");
         TransferLib.transfer(pair, pair.token0, to, address(this), token0Amount, "");
         TransferLib.transfer(pair, pair.token1, to, address(this), token1Amount, "");
 
@@ -67,11 +66,13 @@ contract Vault is ERC1155 {
         uint96 minAmount0Out,
         uint96 minAmount1Out
     ) external returns (uint96 amount0Out, uint96 amount1Out) {
-        Pair memory pair = pairs[pairId];
+        Pair storage pair = pairs[pairId];
 
         (amount0Out, amount1Out) = pair.invariant.removeLiquidity(pair, k);
-        _burn(from, pairId, k);
+        pair.reserve0 -= amount0Out;
+        pair.reserve1 -= amount1Out;
 
+        _burn(from, pairId, k);
         TransferLib.transfer(pair, pair.token0, address(this), from, amount0Out, "");
         TransferLib.transfer(pair, pair.token1, address(this), from, amount1Out, "");
 
@@ -88,11 +89,13 @@ contract Vault is ERC1155 {
         uint256 minAmountOut,
         bytes calldata
     ) external returns (uint96 amountOut) {
-        Pair memory pair = pairs[pairId];
+        Pair storage pair = pairs[pairId];
 
         amountOut = pair.invariant.swap(pair, tokenIn, amountIn);
-        TransferLib.transfer(pair, tokenIn, to, address(this), amountIn, "");
+        (pair.token0 == tokenIn) ? pair.reserve0 += amountIn : pair.reserve1 += amountIn;
+        (pair.token0 == tokenIn) ? pair.reserve1 -= amountOut : pair.reserve0 -= amountOut;
 
+        TransferLib.transfer(pair, tokenIn, to, address(this), amountIn, "");
         TransferLib.transfer(pair, tokenIn, address(this), to, amountOut, "");
 
         require(amountOut >= minAmountOut, "amountOut must be greater than minAmountOut");
