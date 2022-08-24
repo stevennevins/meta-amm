@@ -1,8 +1,17 @@
-# Compiler files
+# Node
+node_modules
+
+# Forge
 cache/
 out/
+test/blacksmith/
 
-# Ignores development broadcast logs
-!/broadcast
-/broadcast/*
-/broadcast/*/31337/
+# Hardhat
+artifacts/
+hh-cache/
+
+# Environment
+.env
+
+# IDE 
+.idea/
