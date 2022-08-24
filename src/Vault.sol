@@ -84,9 +84,8 @@ contract Vault is ERC1155 {
         address to,
         uint256 pairId,
         address tokenIn,
-        uint256 tokenInId,
         uint96 amountIn,
-        uint256 minAmountOut,
+        uint96 minAmountOut,
         bytes calldata
     ) external returns (uint96 amountOut) {
         Pair storage pair = pairs[pairId];
