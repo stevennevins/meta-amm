@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {ICurve, Pair} from "../interfaces/ICurve.sol";
 
-contract XYK is ICurve {
+contract XtYK is ICurve {
     uint96 public constant MIN_LP = 10**3;
 
     function addLiquidity(
