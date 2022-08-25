@@ -6,7 +6,7 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 import "../src/Vault.sol";
 import "../src/invariants/XtYK.sol";
 
-contract JittyTest is Test {
+contract JittyERC20Test is Test {
     Vault public vault;
     XtYK public xyk;
     MockERC20 public token0;
@@ -26,7 +26,7 @@ contract JittyTest is Test {
         vm.stopPrank();
     }
 
-    function testCreateERC20Pair() public {
+    function testCreatePairERC20() public {
         assertTrue(address(token0) < address(token1));
 
         uint256 pairId = vault.createPair(address(token0), 0, address(token1), 0, xyk);
@@ -37,16 +37,21 @@ contract JittyTest is Test {
         assertTrue(pairId == computedPairId);
     }
 
-    function testAddLiquidity() public {
-        testCreateERC20Pair();
+    function testAddLiquidityERC20() public {
+        testCreatePairERC20();
 
         vault.addLiquidity(address(0xBEEF), computedPairId, 1 gwei, 1 gwei, 1, "");
         assertEq(token0.balanceOf(address(vault)), 1 gwei);
         assertEq(token1.balanceOf(address(vault)), 1 gwei);
     }
 
-    function testSwap() public {
-        testAddLiquidity();
+    function testSwapERC20() public {
+        testAddLiquidityERC20();
         vault.swap(address(0xBEEF), computedPairId, address(token0), 0.0001 gwei, 1, "");
+    }
+
+    function testRemoveLiquidityERC20() public {
+        testAddLiquidityERC20();
+        vault.removeLiquidity(address(0xBEEF), computedPairId, 1 gwei << 1, 1, 1);
     }
 }
