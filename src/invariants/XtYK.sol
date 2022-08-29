@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {ICurve, Pair} from "../interfaces/ICurve.sol";
+import "forge-std/Test.sol";
 
 contract XtYK is ICurve {
     uint96 public constant MIN_LP = 10**3;
@@ -49,12 +50,14 @@ contract XtYK is ICurve {
         uint96 reserve0 = pair.reserve0;
         uint96 reserve1 = pair.reserve1;
 
-        if (tokenIn == pair.token0) {
-            amountOut = _getAmountOut(amountIn, reserve0, reserve1);
-        } else {
-            require(tokenIn == pair.token1, "invalid input token");
-            amountOut = _getAmountOut(amountIn, reserve1, reserve0);
-        }
+        uint96 reserveIn;
+        uint96 reserveOut;
+
+        (tokenIn == pair.token0)
+            ? (reserveIn = reserve0, reserveOut = reserve1)
+            : (reserveIn = reserve1, reserveOut = reserve0);
+
+        amountOut = _getAmountOut(amountIn, reserveIn, reserveOut);
     }
 
     function _getAmountOut(

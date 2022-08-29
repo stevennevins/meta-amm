@@ -6,7 +6,7 @@ import {MockERC20} from "./mocks/MockERC20.sol";
 import "../src/Vault.sol";
 import "../src/invariants/XtYK.sol";
 
-contract JittyERC20Test is Test {
+contract VaultERC20Test is Test {
     Vault public vault;
     XtYK public xyk;
     MockERC20 public token0;
@@ -40,18 +40,21 @@ contract JittyERC20Test is Test {
     function testAddLiquidityERC20() public {
         testCreatePairERC20();
 
-        vault.addLiquidity(address(0xBEEF), computedPairId, 1 gwei, 1 gwei, 1, "");
+        bytes memory _transferData = abi.encode(new uint256[](0), "");
+        bytes memory data = abi.encode(_transferData, _transferData);
+        vault.addLiquidity(address(0xBEEF), computedPairId, 1 gwei, 1 gwei, 1, data);
         assertEq(token0.balanceOf(address(vault)), 1 gwei);
         assertEq(token1.balanceOf(address(vault)), 1 gwei);
     }
 
     function testSwapERC20() public {
         testAddLiquidityERC20();
-        vault.swap(address(0xBEEF), computedPairId, address(token0), 0.0001 gwei, 1, "");
+        bytes memory data = abi.encode(new uint256[](0), "");
+        vault.swap(address(0xBEEF), computedPairId, address(token0), 0.0001 gwei, 1, data);
     }
 
     function testRemoveLiquidityERC20() public {
         testAddLiquidityERC20();
-        vault.removeLiquidity(address(0xBEEF), computedPairId, 1 gwei << 1, 1, 1);
+        vault.removeLiquidity(address(0xBEEF), computedPairId, 1 gwei * 1 gwei - 1000, 1, 1);
     }
 }

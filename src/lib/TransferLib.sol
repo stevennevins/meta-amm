@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {ERC165Checker} from "openzeppelin-contracts/contracts/utils/introspection/ERC165Checker.sol";
-
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import {IERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/IERC1155.sol";
@@ -10,35 +8,6 @@ import {IERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/IERC1155.
 import {Pair} from "../interfaces/ICurve.sol";
 
 library TransferLib {
-    using ERC165Checker for address;
-
-    function transfer(
-        Pair memory pair,
-        address token0or1,
-        address from,
-        address to,
-        uint96 amount,
-        bytes memory data
-    ) internal {
-        uint256 token0or1Id;
-        if (token0or1.supportsInterface(type(IERC20).interfaceId) && from == address(this)) {
-            _performERC20Transfer(token0or1, to, amount);
-        } else if (token0or1.supportsInterface(type(IERC20).interfaceId)) {
-            _performERC20TransferFrom(token0or1, from, to, amount);
-        } else if (token0or1.supportsInterface(type(IERC721).interfaceId)) {
-            require(token0or1 == pair.token0 || token0or1 == pair.token1, "invalid token");
-            token0or1Id = (token0or1 == pair.token0) ? pair.token0Id : pair.token1Id;
-            _performERC721Transfer(token0or1, from, to, token0or1Id);
-        } else if (token0or1.supportsInterface(type(IERC1155).interfaceId)) {
-            require(token0or1 == pair.token0 || token0or1 == pair.token1, "invalid token");
-            token0or1Id = (token0or1 == pair.token0) ? pair.token0Id : pair.token1Id;
-            _performERC1155Transfer(token0or1, from, to, token0or1Id, amount, data);
-        } else {
-            /// can try and catch if supports interface isn't supported and then revert
-            require(false, "token0or1 must support ERC20, ERC721, or ERC1155");
-        }
-    }
-
     /**
      * @dev Internal function to transfer ERC20 tokens from the vault to
      *      a given recipient.
