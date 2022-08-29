@@ -20,15 +20,15 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     string public constant name = "";
     string public constant symbol = "";
 
-    /// maybe i should store ERC721s in a list and pop and transfer
+    bytes4 public constant ERC20_INTERFACE_ID = type(IERC20).interfaceId;
+    bytes4 public constant ERC721_INTERFACE_ID = type(IERC721).interfaceId;
+    bytes4 public constant ERC1155_INTERFACE_ID = type(IERC1155).interfaceId;
 
     function uri(uint256) public pure override returns (string memory) {
         return "";
     }
 
     mapping(uint256 => Pair) public pairs; /// pairId => Pair
-    /// 65k is probably a pretty safe assumption for erc721s
-    /// could additionally scope this to be by AMM but I think just tracking balanceOf and then overwriting the slots will save gas
     mapping(address => mapping(uint256 => uint256)) public enumeratedIds; /// token adddress => index => id held , balanceOf(address(this)) = upperBound of index
     /// we only need this for ERC1155 because 721s we can get balanceOf directly (unless balanceOf gets overloaded in ERC1155B)
     mapping(address => uint256) public lengthIds;
@@ -36,22 +36,70 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     function createPair(
         address token0,
         uint256 token0Id,
+        bytes4 token0InterfaceId,
         address token1,
         uint256 token1Id,
+        bytes4 token1InterfaceId,
         ICurve invariant
     ) external returns (uint256 pairId) {
         if (token0 >= token1) {
             require(token0 != token1, "token0 and token1 must be different");
             /// sort tokens to prevent duplicates
-            (token1, token1Id, token0, token0Id) = (token0, token0Id, token1, token1Id);
+            (token1, token1Id, token1InterfaceId, token0, token0Id, token0InterfaceId) = (
+                token0,
+                token0Id,
+                token0InterfaceId,
+                token1,
+                token1Id,
+                token1InterfaceId
+            );
         }
 
-        pairId = uint256(keccak256(abi.encode(token0, token0Id, token1, token1Id, invariant)));
+        /// maybe delegate this to the AMM contract? where the AMM says what tokenInterfaces it accepts
+        /// and then we also just check the token supports that interface Id
+        require(
+            (token0InterfaceId == ERC20_INTERFACE_ID ||
+                token0InterfaceId == ERC721_INTERFACE_ID ||
+                token0InterfaceId == ERC1155_INTERFACE_ID) &&
+                token0.supportsInterface(token0InterfaceId),
+            "token0 does not support token0InterfaceId"
+        );
+        require(
+            (token1InterfaceId == ERC20_INTERFACE_ID ||
+                token1InterfaceId == ERC721_INTERFACE_ID ||
+                token1InterfaceId == ERC1155_INTERFACE_ID) &&
+                token1.supportsInterface(token1InterfaceId),
+            "token1 does not support token1InterfaceId"
+        );
+
+        pairId = uint256(
+            keccak256(
+                abi.encode(
+                    token0,
+                    token0Id,
+                    token0InterfaceId,
+                    token1,
+                    token1Id,
+                    token1InterfaceId,
+                    invariant
+                )
+            )
+        );
 
         require(address(invariant).code.length != 0, "amm must be a contract");
         require(address(pairs[pairId].invariant) == address(0), "pair already exists");
 
-        pairs[pairId] = Pair(token0, 0, token0Id, token1, 0, token1Id, invariant);
+        pairs[pairId] = Pair(
+            token0,
+            0,
+            token0Id,
+            token1,
+            0,
+            token1Id,
+            invariant,
+            token0InterfaceId,
+            token1InterfaceId
+        );
     }
 
     function addLiquidity(
@@ -132,7 +180,10 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         bytes memory data
     ) internal {
         uint256 tokenId;
-        if (token.supportsInterface(type(IERC20).interfaceId)) {
+        bytes4 interfaceId = (token == pair.token0)
+            ? pair.token0InterfaceId
+            : pair.token1InterfaceId;
+        if (interfaceId == ERC20_INTERFACE_ID) {
             if (from == address(this)) {
                 token._performERC20Transfer(to, amount);
             } else {
@@ -140,7 +191,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             }
             return;
         }
-        if (token.supportsInterface(type(IERC721).interfaceId)) {
+        if (interfaceId == ERC721_INTERFACE_ID) {
             if (from == address(this)) {
                 uint256 upper = IERC721(token).balanceOf(from);
                 uint256 lower = upper - amount;
@@ -159,7 +210,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             }
             return;
         }
-        if (token.supportsInterface(type(IERC1155).interfaceId)) {
+        if (interfaceId == ERC1155_INTERFACE_ID) {
             tokenId = (token == pair.token0) ? pair.token0Id : pair.token1Id;
             token._performERC1155Transfer(from, to, tokenId, amount, data);
             return;

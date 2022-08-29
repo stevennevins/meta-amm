@@ -8,6 +8,8 @@ import "../src/Vault.sol";
 import "../src/invariants/XtYK.sol";
 
 contract VaultERC1155Test is Test {
+    bytes4 public constant ERC20_INTERFACE_ID = type(IERC20).interfaceId;
+    bytes4 public constant ERC1155_INTERFACE_ID = type(IERC1155).interfaceId;
     Vault public vault;
     XtYK public xyk;
     MockERC1155 public token0;
@@ -30,9 +32,27 @@ contract VaultERC1155Test is Test {
     function testCreatePairERC1155ERC20() public {
         assertTrue(address(token0) < address(token1));
 
-        uint256 pairId = vault.createPair(address(token0), 1, address(token1), 0, xyk);
+        uint256 pairId = vault.createPair(
+            address(token0),
+            1,
+            ERC1155_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            xyk
+        );
         computedPairId = uint256(
-            keccak256(abi.encode(address(token0), 1, address(token1), 0, address(xyk)))
+            keccak256(
+                abi.encode(
+                    address(token0),
+                    1,
+                    ERC1155_INTERFACE_ID,
+                    address(token1),
+                    0,
+                    ERC20_INTERFACE_ID,
+                    address(xyk)
+                )
+            )
         );
 
         assertTrue(pairId == computedPairId);

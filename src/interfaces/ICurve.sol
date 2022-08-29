@@ -9,6 +9,8 @@ struct Pair {
     uint96 reserve1; // second pair token reserve
     uint256 token1Id; // second pair token id
     ICurve invariant; // amm contract
+    bytes4 token0InterfaceId; // first pair token interface id
+    bytes4 token1InterfaceId; // first pair token interface id
 }
 
 interface ICurve {
