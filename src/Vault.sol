@@ -29,9 +29,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     }
 
     mapping(uint256 => Pair) public pairs; /// pairId => Pair
-    mapping(address => mapping(uint256 => uint256)) public enumeratedIds; /// token adddress => index => id held , balanceOf(address(this)) = upperBound of index
-    /// we only need this for ERC1155 because 721s we can get balanceOf directly (unless balanceOf gets overloaded in ERC1155B)
-    mapping(address => uint256) public lengthIds;
+    mapping(address => mapping(uint256 => uint256)) public enumeratedIds; /// token adddress => index => id held by Vault, balanceOf(address(this)) = current index
 
     function createPair(
         address token0,
@@ -72,75 +70,77 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             "token1 does not support token1InterfaceId"
         );
 
-        pairId = uint256(
-            keccak256(
-                abi.encode(
-                    token0,
-                    token0Id,
-                    token0InterfaceId,
-                    token1,
-                    token1Id,
-                    token1InterfaceId,
-                    invariant
-                )
-            )
+        bytes memory pairData = abi.encode(
+            token0,
+            token0Id,
+            token0InterfaceId,
+            token1,
+            token1Id,
+            token1InterfaceId,
+            invariant
         );
+        pairId = uint256(keccak256(pairData));
 
         require(address(invariant).code.length != 0, "amm must be a contract");
-        require(address(pairs[pairId].invariant) == address(0), "pair already exists");
+        require(pairs[pairId].reserve0 == 0 && pairs[pairId].reserve1 == 0, "pair already exists");
 
-        pairs[pairId] = Pair(
-            token0,
-            0,
-            token0Id,
-            token1,
-            0,
-            token1Id,
-            invariant,
-            token0InterfaceId,
-            token1InterfaceId
-        );
+        pairs[pairId] = Pair(0, 0);
     }
 
     function addLiquidity(
         address to,
-        uint256 pairId,
         uint96 token0Amount,
         uint96 token1Amount,
         uint96 minK,
-        bytes calldata data
+        bytes calldata pairData,
+        bytes calldata transferData
     ) external returns (uint96 k) {
+        uint256 pairId = uint256(keccak256(pairData));
         Pair storage pair = pairs[pairId];
 
-        k = pair.invariant.addLiquidity(pair, token0Amount, token1Amount);
+        (address token0, , , address token1, , , ICurve invariant) = abi.decode(
+            pairData,
+            (address, uint256, bytes4, address, uint256, bytes4, ICurve)
+        );
+
+        k = invariant.addLiquidity(pair, token0Amount, token1Amount);
         pair.reserve0 += token0Amount;
         pair.reserve1 += token1Amount;
 
-        (bytes memory token0Data, bytes memory token1Data) = abi.decode(data, (bytes, bytes));
+        (bytes memory token0Data, bytes memory token1Data) = abi.decode(
+            transferData,
+            (bytes, bytes)
+        );
 
         _mint(to, pairId, k, "");
-        _transfer(pair, pair.token0, to, address(this), token0Amount, token0Data);
-        _transfer(pair, pair.token1, to, address(this), token1Amount, token1Data);
+        _transfer(token0, to, address(this), token0Amount, pairData, token0Data);
+        _transfer(token1, to, address(this), token1Amount, pairData, token1Data);
 
         require(k >= minK, "liquidity must be greater than minK liquidity");
     }
 
     function removeLiquidity(
         address from,
-        uint256 pairId,
         uint96 k,
         uint96 minAmount0Out,
-        uint96 minAmount1Out
+        uint96 minAmount1Out,
+        bytes calldata pairData
     ) external returns (uint96 amount0Out, uint96 amount1Out) {
+        uint256 pairId = uint256(keccak256(pairData));
         Pair storage pair = pairs[pairId];
 
-        (amount0Out, amount1Out) = pair.invariant.removeLiquidity(pair, k);
+        (address token0, , , address token1, , , ICurve invariant) = abi.decode(
+            pairData,
+            (address, uint256, bytes4, address, uint256, bytes4, ICurve)
+        );
+
+        (amount0Out, amount1Out) = invariant.removeLiquidity(pair, k);
         pair.reserve0 -= amount0Out;
         pair.reserve1 -= amount1Out;
 
         _burn(from, pairId, k);
-        _transfer(pair, pair.token0, address(this), from, amount0Out, "");
-        _transfer(pair, pair.token1, address(this), from, amount1Out, "");
+        _transfer(token0, address(this), from, amount0Out, pairData, "");
+        _transfer(token1, address(this), from, amount1Out, pairData, "");
 
         require(amount0Out >= minAmount0Out, "amountOut must be greater than minAmountOut");
         require(amount1Out >= minAmount1Out, "amountOut must be greater than minAmountOut");
@@ -148,41 +148,54 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
 
     function swap(
         address to,
-        uint256 pairId,
         address tokenIn,
         uint96 amountIn,
         uint96 minAmountOut,
-        bytes calldata data
+        bytes calldata pairData,
+        bytes calldata transferData
     ) external returns (address tokenOut, uint96 amountOut) {
+        uint256 pairId = uint256(keccak256(pairData));
         Pair storage pair = pairs[pairId];
-        address token0 = pair.token0;
-        address token1 = pair.token1;
+
+        (address token0, , , address token1, , , ICurve invariant) = abi.decode(
+            pairData,
+            (address, uint256, bytes4, address, uint256, bytes4, ICurve)
+        );
+
         require(tokenIn == token0 || tokenIn == token1, "invalid token");
 
-        amountOut = pair.invariant.swap(pair, tokenIn, amountIn);
         tokenOut = (tokenIn == token0) ? token1 : token0;
+        amountOut = invariant.swap(pair, token0, tokenIn, amountIn);
 
         (token0 == tokenIn) ? pair.reserve0 += amountIn : pair.reserve0 -= amountOut;
         (token1 == tokenIn) ? pair.reserve1 += amountIn : pair.reserve1 -= amountOut;
 
-        _transfer(pair, tokenIn, to, address(this), amountIn, data);
-        _transfer(pair, tokenOut, address(this), to, amountOut, "");
+        _transfer(tokenIn, to, address(this), amountIn, pairData, transferData);
+        _transfer(tokenOut, address(this), to, amountOut, pairData, "");
 
         require(amountOut >= minAmountOut, "amountOut must be greater than minAmountOut");
     }
 
     function _transfer(
-        Pair memory pair,
         address token,
         address from,
         address to,
         uint96 amount,
-        bytes memory data
+        bytes calldata pairData,
+        bytes memory transferData
     ) internal {
         uint256 tokenId;
-        bytes4 interfaceId = (token == pair.token0)
-            ? pair.token0InterfaceId
-            : pair.token1InterfaceId;
+        (
+            address token0,
+            uint256 token0Id,
+            bytes4 token0InterfaceId,
+            address token1,
+            uint256 token1Id,
+            bytes4 token1InterfaceId,
+
+        ) = abi.decode(pairData, (address, uint256, bytes4, address, uint256, bytes4, ICurve));
+
+        bytes4 interfaceId = (token == token0) ? token0InterfaceId : token1InterfaceId;
         if (interfaceId == ERC20_INTERFACE_ID) {
             if (from == address(this)) {
                 token._performERC20Transfer(to, amount);
@@ -199,7 +212,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
                     token._performERC721Transfer(from, to, lower);
                 }
             } else {
-                uint256[] memory ids = abi.decode(data, (uint256[]));
+                uint256[] memory ids = abi.decode(transferData, (uint256[]));
                 uint256 length = ids.length;
                 uint256 totalIds = IERC721(token).balanceOf(to);
                 for (uint256 i; i < length; i++) {
@@ -211,8 +224,8 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             return;
         }
         if (interfaceId == ERC1155_INTERFACE_ID) {
-            tokenId = (token == pair.token0) ? pair.token0Id : pair.token1Id;
-            token._performERC1155Transfer(from, to, tokenId, amount, data);
+            tokenId = (token == token0) ? token0Id : token1Id;
+            token._performERC1155Transfer(from, to, tokenId, amount, transferData);
             return;
         }
         /// also would be nice to add 1155B support

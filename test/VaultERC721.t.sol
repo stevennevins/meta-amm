@@ -61,6 +61,15 @@ contract VaultERC721Test is Test {
 
     function testAddLiquidityERC20ERC721() public {
         testCreatePairERC20ERC721();
+        bytes memory pairData = abi.encode(
+            address(token0),
+            0,
+            ERC721_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            address(xyk)
+        );
 
         uint256[] memory ids = new uint256[](100);
         for (uint256 i; i < 100; i++) ids[i] = i;
@@ -69,32 +78,62 @@ contract VaultERC721Test is Test {
         bytes memory data = abi.encode(_transferData, "");
 
         vm.prank(address(0xBEEF));
-        vault.addLiquidity(address(0xBEEF), computedPairId, 100, 1 gwei, 0, data);
+        vault.addLiquidity(address(0xBEEF), 100, 1 gwei, 0, pairData, data);
         assertEq(token0.balanceOf(address(vault)), 100);
         assertEq(token1.balanceOf(address(vault)), 1 gwei);
     }
 
     function testSwapERC20toERC721() public {
         testAddLiquidityERC20ERC721();
+
+        bytes memory pairData = abi.encode(
+            address(token0),
+            0,
+            ERC721_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            address(xyk)
+        );
+
         vm.prank(address(0xBEEF));
-        vault.swap(address(0xBEEF), computedPairId, address(token1), 0.5 gwei, 1, "");
+        vault.swap(address(0xBEEF), address(token1), 0.5 gwei, 1, pairData, "");
     }
 
     function testSwapERC721toERC20() public {
         testAddLiquidityERC20ERC721();
+        bytes memory pairData = abi.encode(
+            address(token0),
+            0,
+            ERC721_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            address(xyk)
+        );
 
         uint256[] memory ids = new uint256[](1);
         ids[0] = 100;
         bytes memory data = abi.encode(ids);
 
         vm.prank(address(0xBEEF));
-        vault.swap(address(0xBEEF), computedPairId, address(token0), 1, 0, data);
+        vault.swap(address(0xBEEF), address(token0), 1, 0, pairData, data);
     }
 
     function testRemoveLiquidityERC20() public {
         testAddLiquidityERC20ERC721();
 
+        bytes memory pairData = abi.encode(
+            address(token0),
+            0,
+            ERC721_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            address(xyk)
+        );
+
         vm.prank(address(0xBEEF));
-        vault.removeLiquidity(address(0xBEEF), computedPairId, 1 gwei * 1, 1, 1);
+        vault.removeLiquidity(address(0xBEEF), 1 gwei * 1, 1, 1, pairData);
     }
 }

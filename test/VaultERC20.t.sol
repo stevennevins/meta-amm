@@ -60,21 +60,51 @@ contract VaultERC20Test is Test {
     function testAddLiquidityERC20() public {
         testCreatePairERC20();
 
+        bytes memory pairData = abi.encode(
+            address(token0),
+            0,
+            ERC20_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            address(xyk)
+        );
+
         bytes memory _transferData = abi.encode(new uint256[](0), "");
         bytes memory data = abi.encode(_transferData, _transferData);
-        vault.addLiquidity(address(0xBEEF), computedPairId, 1 gwei, 1 gwei, 1, data);
+        vault.addLiquidity(address(0xBEEF), 1 gwei, 1 gwei, 1, pairData, data);
         assertEq(token0.balanceOf(address(vault)), 1 gwei);
         assertEq(token1.balanceOf(address(vault)), 1 gwei);
     }
 
     function testSwapERC20() public {
         testAddLiquidityERC20();
+        bytes memory pairData = abi.encode(
+            address(token0),
+            0,
+            ERC20_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            address(xyk)
+        );
+
         bytes memory data = abi.encode(new uint256[](0), "");
-        vault.swap(address(0xBEEF), computedPairId, address(token0), 0.0001 gwei, 1, data);
+        vault.swap(address(0xBEEF), address(token0), 0.0001 gwei, 1, pairData, data);
     }
 
     function testRemoveLiquidityERC20() public {
         testAddLiquidityERC20();
-        vault.removeLiquidity(address(0xBEEF), computedPairId, 1 gwei * 1 gwei - 1000, 1, 1);
+        bytes memory pairData = abi.encode(
+            address(token0),
+            0,
+            ERC20_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            address(xyk)
+        );
+
+        vault.removeLiquidity(address(0xBEEF), 1 gwei * 1 gwei - 1000, 1, 1, pairData);
     }
 }

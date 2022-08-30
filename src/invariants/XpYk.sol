@@ -2,11 +2,8 @@
 pragma solidity ^0.8.0;
 
 import {ICurve, Pair} from "../interfaces/ICurve.sol";
-import "forge-std/Test.sol";
 
-contract XtYK is ICurve {
-    uint96 public constant MIN_LP = 10**3;
-
+contract XpYK is ICurve {
     function addLiquidity(
         Pair memory pair,
         uint96 token0Amount,
@@ -15,10 +12,10 @@ contract XtYK is ICurve {
         uint96 reserve0 = pair.reserve0;
         uint96 reserve1 = pair.reserve1;
 
-        uint96 totalK = reserve0 * reserve1;
+        uint96 totalK = reserve0 + reserve1;
 
         if (totalK == 0) {
-            k = token0Amount * token1Amount - MIN_LP;
+            k = token0Amount + token1Amount;
         } else {
             k = _min((token0Amount * totalK) / reserve0, (token1Amount * totalK) / reserve1);
         }
@@ -34,7 +31,7 @@ contract XtYK is ICurve {
         uint96 reserve0 = pair.reserve0;
         uint96 reserve1 = pair.reserve1;
 
-        uint96 totalK = reserve0 * reserve1;
+        uint96 totalK = reserve0 + reserve1;
 
         amount0Out = (k * reserve0) / totalK;
         amount1Out = (k * reserve1) / totalK;
@@ -42,9 +39,7 @@ contract XtYK is ICurve {
         require(amount0Out != 0 && amount1Out != 0, "insufficient K");
     }
 
-    function swap(Pair memory pairIn, uint96 amountIn) external pure returns (uint96 amountOut) {
-        amountOut = _getAmountOut(amountIn, pairIn.reserve0, pairIn.reserve1);
-    }
+    function swap(Pair memory pair, uint96 amountIn) external pure returns (uint96 amountOut) {}
 
     function _getAmountOut(
         uint96 amountIn,
