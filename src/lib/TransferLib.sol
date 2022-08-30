@@ -19,7 +19,7 @@ library TransferLib {
     function _performERC20Transfer(
         address token,
         address to,
-        uint96 amount
+        uint128 amount
     ) internal {
         require(token.code.length != 0, "not token");
         (bool ok, bytes memory data) = token.call(
@@ -47,7 +47,7 @@ library TransferLib {
         address token,
         address from,
         address to,
-        uint96 amount
+        uint128 amount
     ) internal {
         require(token.code.length != 0, "not token");
         (bool ok, bytes memory data) = token.call(
@@ -99,7 +99,7 @@ library TransferLib {
         address from,
         address to,
         uint256 id,
-        uint96 amount,
+        uint128 amount,
         bytes memory data
     ) internal {
         require(token.code.length != 0, "not token");

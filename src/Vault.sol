@@ -89,23 +89,23 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
 
     function addLiquidity(
         address to,
-        uint96 token0Amount,
-        uint96 token1Amount,
-        uint96 minK,
+        uint128 token0Amount,
+        uint128 token1Amount,
+        uint128 minK,
         bytes calldata pairData,
         bytes calldata transferData
-    ) external returns (uint96 k) {
+    ) external returns (uint128 k) {
         k = _addLiquidity(to, token0Amount, token1Amount, pairData, transferData);
         require(k >= minK, "liquidity must be greater than minK liquidity");
     }
 
     function _addLiquidity(
         address to,
-        uint96 token0Amount,
-        uint96 token1Amount,
+        uint128 token0Amount,
+        uint128 token1Amount,
         bytes calldata pairData,
         bytes calldata transferData
-    ) internal returns (uint96 k) {
+    ) internal returns (uint128 k) {
         uint256 pairId = uint256(keccak256(pairData));
         Pair storage pair = pairs[pairId];
 
@@ -130,11 +130,11 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
 
     function removeLiquidity(
         address from,
-        uint96 k,
-        uint96 minAmount0Out,
-        uint96 minAmount1Out,
+        uint128 k,
+        uint128 minAmount0Out,
+        uint128 minAmount1Out,
         bytes calldata pairData
-    ) external returns (uint96 amount0Out, uint96 amount1Out) {
+    ) external returns (uint128 amount0Out, uint128 amount1Out) {
         (amount0Out, amount1Out) = _removeLiquidity(from, k, pairData);
 
         require(amount0Out >= minAmount0Out, "amountOut must be greater than minAmountOut");
@@ -143,9 +143,9 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
 
     function _removeLiquidity(
         address from,
-        uint96 k,
+        uint128 k,
         bytes calldata pairData
-    ) internal returns (uint96 amount0Out, uint96 amount1Out) {
+    ) internal returns (uint128 amount0Out, uint128 amount1Out) {
         uint256 pairId = uint256(keccak256(pairData));
         Pair storage pair = pairs[pairId];
 
@@ -166,11 +166,11 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     function swap(
         address to,
         address tokenIn,
-        uint96 amountIn,
-        uint96 minAmountOut,
+        uint128 amountIn,
+        uint128 minAmountOut,
         bytes calldata pairData,
         bytes calldata transferData
-    ) external returns (address tokenOut, uint96 amountOut) {
+    ) external returns (address tokenOut, uint128 amountOut) {
         (tokenOut, amountOut) = _swap(to, tokenIn, amountIn, pairData, transferData);
 
         require(amountOut >= minAmountOut, "amountOut must be greater than minAmountOut");
@@ -179,10 +179,10 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     function _swap(
         address to,
         address tokenIn,
-        uint96 amountIn,
+        uint128 amountIn,
         bytes calldata pairData,
         bytes calldata transferData
-    ) internal returns (address tokenOut, uint96 amountOut) {
+    ) internal returns (address tokenOut, uint128 amountOut) {
         uint256 pairId = uint256(keccak256(pairData));
         Pair storage pair = pairs[pairId];
         (address token0, , , address token1, , , ICurve invariant) = abi.decode(
@@ -206,7 +206,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         address token,
         address from,
         address to,
-        uint96 amount,
+        uint128 amount,
         bytes calldata pairData,
         bytes memory transferData
     ) internal {

@@ -2,24 +2,24 @@
 pragma solidity ^0.8.0;
 
 struct Pair {
-    uint96 reserve0; // first pair token reserve
-    uint96 reserve1; // second pair token reserve
+    uint128 reserve0; // first pair token reserve
+    uint128 reserve1; // second pair token reserve
 }
 
 interface ICurve {
     function addLiquidity(
         Pair memory pair,
-        uint96 token0Amount,
-        uint96 token1Amount
-    ) external returns (uint96);
+        uint128 token0Amount,
+        uint128 token1Amount
+    ) external returns (uint128);
 
-    function removeLiquidity(Pair memory pair, uint96 k)
+    function removeLiquidity(Pair memory pair, uint128 k)
         external
-        returns (uint96 amount0Out, uint96 amount1Out);
+        returns (uint128 amount0Out, uint128 amount1Out);
 
     function swap(
-        uint96 reserveIn,
-        uint96 reserveOut,
-        uint96 amountIn
-    ) external returns (uint96 amountOut);
+        uint128 reserveIn,
+        uint128 reserveOut,
+        uint128 amountIn
+    ) external returns (uint128 amountOut);
 }

@@ -21,8 +21,8 @@ contract VaultERC1155Test is Test {
         xyk = new XtYK();
         token0 = new MockERC1155();
         token1 = new MockERC20("", "", 18);
-        token0.mint(address(0xBEEF), 1, type(uint96).max);
-        token1.mint(address(0xBEEF), type(uint96).max);
+        token0.mint(address(0xBEEF), 1, type(uint128).max);
+        token1.mint(address(0xBEEF), type(uint128).max);
         vm.startPrank(address(0xBEEF));
         token0.setApprovalForAll(address(vault), true);
         token1.approve(address(vault), type(uint256).max);

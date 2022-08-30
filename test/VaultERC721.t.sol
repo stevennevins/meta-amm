@@ -23,7 +23,7 @@ contract VaultERC721Test is Test {
         token0 = new MockERC721("", "");
         token1 = new MockERC20("", "", 18);
         for (uint256 i; i < 101; i++) token0.mint(address(0xBEEF), i);
-        token1.mint(address(0xBEEF), type(uint96).max);
+        token1.mint(address(0xBEEF), type(uint128).max);
         vm.startPrank(address(0xBEEF));
         token0.setApprovalForAll(address(vault), true);
         token1.approve(address(vault), type(uint256).max);
