@@ -17,5 +17,9 @@ interface ICurve {
         external
         returns (uint96 amount0Out, uint96 amount1Out);
 
-    function swap(Pair memory pairIn, uint96 amountIn) external returns (uint96 amountOut);
+    function swap(
+        uint96 reserveIn,
+        uint96 reserveOut,
+        uint96 amountIn
+    ) external returns (uint96 amountOut);
 }

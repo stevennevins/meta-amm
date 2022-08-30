@@ -42,8 +42,12 @@ contract XtYK is ICurve {
         require(amount0Out != 0 && amount1Out != 0, "insufficient K");
     }
 
-    function swap(Pair memory pairIn, uint96 amountIn) external pure returns (uint96 amountOut) {
-        amountOut = _getAmountOut(amountIn, pairIn.reserve0, pairIn.reserve1);
+    function swap(
+        uint96 reserveIn,
+        uint96 reserveOut,
+        uint96 amountIn
+    ) external pure returns (uint96 amountOut) {
+        amountOut = _getAmountOut(amountIn, reserveIn, reserveOut);
     }
 
     function _getAmountOut(
