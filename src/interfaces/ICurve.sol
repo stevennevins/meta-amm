@@ -2,15 +2,8 @@
 pragma solidity ^0.8.0;
 
 struct Pair {
-    address token0; // first pair token
     uint96 reserve0; // first pair token reserve
-    uint256 token0Id; // first pair token id
-    address token1; // second pair token
     uint96 reserve1; // second pair token reserve
-    uint256 token1Id; // second pair token id
-    ICurve invariant; // amm contract
-    bytes4 token0InterfaceId; // first pair token interface id
-    bytes4 token1InterfaceId; // first pair token interface id
 }
 
 interface ICurve {
@@ -25,8 +18,8 @@ interface ICurve {
         returns (uint96 amount0Out, uint96 amount1Out);
 
     function swap(
-        Pair memory pair,
-        address tokenIn,
+        uint96 reserveIn,
+        uint96 reserveOut,
         uint96 amountIn
     ) external returns (uint96 amountOut);
 }
