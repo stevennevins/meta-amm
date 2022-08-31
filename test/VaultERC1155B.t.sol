@@ -72,9 +72,10 @@ contract VaultERC1155BTest is Test {
         );
 
         uint256[] memory ids = new uint256[](100);
-        for (uint256 i; i < 100; i++) ids[i] = i;
+        uint256[] memory amounts = new uint256[](100);
+        for (uint256 i; i < 100; i++) (ids[i] = i, amounts[i] = 1);
 
-        bytes memory _transferData = abi.encode(ids, "");
+        bytes memory _transferData = abi.encode(ids, amounts);
         bytes memory data = abi.encode(_transferData, "");
 
         vm.prank(address(0xBEEF));
@@ -113,8 +114,10 @@ contract VaultERC1155BTest is Test {
         );
 
         uint256[] memory ids = new uint256[](1);
+        uint256[] memory amounts = new uint256[](1);
         ids[0] = 100;
-        bytes memory data = abi.encode(ids);
+        amounts[0] = 1;
+        bytes memory data = abi.encode(ids, amounts);
 
         vm.prank(address(0xBEEF));
         vault.swap(address(0xBEEF), address(token0), 1, 0, pairData, data);
@@ -134,6 +137,33 @@ contract VaultERC1155BTest is Test {
         );
 
         vm.prank(address(0xBEEF));
-        vault.removeLiquidity(address(0xBEEF), 1 gwei * 1, 1, 1, pairData);
+        vault.removeLiquidity(address(0xBEEF), 1 gwei * 100 - 1000, 1, 1, pairData);
+    }
+
+    function testRemoveAndAddBackERC1155BERC20() public {
+        testRemoveLiquidityERC20();
+
+        bytes memory pairData = abi.encode(
+            address(token0),
+            0,
+            ERC1155B_INTERFACE_ID,
+            address(token1),
+            0,
+            ERC20_INTERFACE_ID,
+            address(xyk)
+        );
+
+        uint256[] memory ids = new uint256[](100);
+        uint256[] memory amounts = new uint256[](100);
+        for (uint256 i = 101; i < 201; i++) token0.mint(address(0xBEEF), i);
+        for (uint256 i = 101; i < 201; i++) (ids[i - 101] = i, amounts[i - 101] = 1);
+
+        bytes memory _transferData = abi.encode(ids, amounts);
+        bytes memory data = abi.encode(_transferData, "");
+
+        vm.prank(address(0xBEEF));
+        vault.addLiquidity(address(0xBEEF), 100, 1 gwei, 0, pairData, data);
+        // assertEq(token0.balanceOf(address(vault)), 100);
+        // assertEq(token1.balanceOf(address(vault)), 1 gwei);
     }
 }

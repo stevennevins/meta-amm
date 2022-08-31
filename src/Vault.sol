@@ -259,6 +259,9 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         }
         if (interfaceId == ERC1155B_INTERFACE_ID) {
             if (from == address(this)) {
+                /// that sequential fixed sized array storage access post might still be useful here
+                // (, uint256 memory amounts) = abi.decode(transferData, (uint256[], uint256[]));
+
                 uint256[] memory ids = new uint256[](uint256(amount));
                 uint256[] memory amounts = new uint256[](uint256(amount));
                 uint256 upper = currentIndex[token];
@@ -270,15 +273,13 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
                 }
                 token._performERC1155BatchTransfer(from, to, ids, amounts, "");
             } else {
-                uint256[] memory ids = abi.decode(transferData, (uint256[]));
+                (uint256[] memory ids, uint256[] memory amounts) = abi.decode(
+                    transferData,
+                    (uint256[], uint256[])
+                );
                 uint256 length = ids.length;
-                uint256[] memory amounts = new uint256[](length);
                 uint256 totalIds = currentIndex[token];
-                for (uint256 i; i < length; i++) {
-                    tokenId = ids[i];
-                    amounts[i] = 1;
-                    enumeratedIds[token][totalIds++] = tokenId;
-                }
+                for (uint256 i; i < length; i++) enumeratedIds[token][totalIds++] = ids[i];
                 currentIndex[token] += uint128(length);
                 token._performERC1155BatchTransfer(from, to, ids, amounts, "");
             }
