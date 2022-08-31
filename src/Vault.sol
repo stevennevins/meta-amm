@@ -6,11 +6,10 @@ import {ERC1155, ERC1155TokenReceiver} from "solmate/tokens/ERC1155.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import {IERC1155} from "openzeppelin-contracts/contracts/token/ERC1155/IERC1155.sol";
+import {ERC1155B} from "../test/mocks/ERC1155B.sol";
 
 import {ICurve, Pair} from "./interfaces/ICurve.sol";
 import {TransferLib} from "./lib/TransferLib.sol";
-
-import "forge-std/Test.sol";
 
 /// a minimalistic meta AMM
 contract Vault is ERC1155, ERC1155TokenReceiver {
@@ -23,6 +22,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     bytes4 public constant ERC20_INTERFACE_ID = type(IERC20).interfaceId;
     bytes4 public constant ERC721_INTERFACE_ID = type(IERC721).interfaceId;
     bytes4 public constant ERC1155_INTERFACE_ID = type(IERC1155).interfaceId;
+    bytes4 public constant ERC1155B_INTERFACE_ID = type(ERC1155B).interfaceId;
 
     function uri(uint256) public pure override returns (string memory) {
         return "";
@@ -30,6 +30,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
 
     mapping(uint256 => Pair) public pairs; /// pairId => Pair
     mapping(address => mapping(uint256 => uint256)) public enumeratedIds; /// token adddress => index => id held by Vault, balanceOf(address(this)) = current index
+    mapping(address => uint128) public currentIndex; /// token address => current Index
 
     function createPair(
         address token0,
@@ -58,14 +59,16 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         require(
             (token0InterfaceId == ERC20_INTERFACE_ID ||
                 token0InterfaceId == ERC721_INTERFACE_ID ||
-                token0InterfaceId == ERC1155_INTERFACE_ID) &&
+                token0InterfaceId == ERC1155_INTERFACE_ID ||
+                token0InterfaceId == ERC1155B_INTERFACE_ID) &&
                 token0.supportsInterface(token0InterfaceId),
             "token0 does not support token0InterfaceId"
         );
         require(
             (token1InterfaceId == ERC20_INTERFACE_ID ||
                 token1InterfaceId == ERC721_INTERFACE_ID ||
-                token1InterfaceId == ERC1155_INTERFACE_ID) &&
+                token1InterfaceId == ERC1155_INTERFACE_ID ||
+                token1InterfaceId == ERC1155B_INTERFACE_ID) &&
                 token1.supportsInterface(token1InterfaceId),
             "token1 does not support token1InterfaceId"
         );
@@ -254,6 +257,34 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             token._performERC1155Transfer(from, to, tokenId, amount, transferData);
             return;
         }
+        if (interfaceId == ERC1155B_INTERFACE_ID) {
+            if (from == address(this)) {
+                uint256[] memory ids = new uint256[](uint256(amount));
+                uint256[] memory amounts = new uint256[](uint256(amount));
+                uint256 upper = currentIndex[token];
+                uint256 lower = upper - amount;
+                currentIndex[token] = uint128(lower);
+                for (uint256 i; lower < upper; lower++) {
+                    ids[i] = enumeratedIds[token][lower];
+                    amounts[i++] = 1;
+                }
+                token._performERC1155BatchTransfer(from, to, ids, amounts, "");
+            } else {
+                uint256[] memory ids = abi.decode(transferData, (uint256[]));
+                uint256 length = ids.length;
+                uint256[] memory amounts = new uint256[](length);
+                uint256 totalIds = currentIndex[token];
+                for (uint256 i; i < length; i++) {
+                    tokenId = ids[i];
+                    amounts[i] = 1;
+                    enumeratedIds[token][totalIds++] = tokenId;
+                }
+                currentIndex[token] += uint128(length);
+                token._performERC1155BatchTransfer(from, to, ids, amounts, "");
+            }
+            return;
+        }
+
         /// also would be nice to add 1155B support
         /// can try and catch if supports interface isn't supported and then revert
         revert("token must support ERC20, ERC721, or ERC1155");

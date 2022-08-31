@@ -105,4 +105,29 @@ library TransferLib {
         require(token.code.length != 0, "not token");
         IERC1155(token).safeTransferFrom(from, to, id, amount, data);
     }
+
+    /**
+     * @dev Internal function to transfer ERC1155 tokens from a given
+     *      originator to a given recipient. Sufficient approvals must be set on
+     *      the contract performing the transfer and contract recipients must
+     *      implement onReceived to indicate that they are willing to accept the
+     *      transfer.
+     *
+     * @param token      The ERC1155 token to transfer.
+     * @param from       The originator of the transfer.
+     * @param to         The recipient of the transfer.
+     * @param ids         The ids to transfer.
+     * @param amounts     The amounts to transfer.
+     */
+    function _performERC1155BatchTransfer(
+        address token,
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) internal {
+        require(token.code.length != 0, "not token");
+        IERC1155(token).safeBatchTransferFrom(from, to, ids, amounts, data);
+    }
 }
