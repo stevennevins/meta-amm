@@ -33,15 +33,6 @@ contract VaultERC1155BTest is Test {
     function testCreatePairERC20ERC1155B() public {
         assertTrue(address(token0) < address(token1));
 
-        uint256 pairId = vault.createPair(
-            address(token0),
-            0,
-            ERC1155B_INTERFACE_ID,
-            address(token1),
-            0,
-            ERC20_INTERFACE_ID,
-            xyk
-        );
         computedPairId = uint256(
             keccak256(
                 abi.encode(
@@ -55,8 +46,6 @@ contract VaultERC1155BTest is Test {
                 )
             )
         );
-
-        assertTrue(pairId == computedPairId);
     }
 
     function testAddLiquidityERC20ERC1155B() public {

@@ -19,10 +19,10 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     string public constant name = "";
     string public constant symbol = "";
 
-    bytes4 public constant ERC20_INTERFACE_ID = type(IERC20).interfaceId;
-    bytes4 public constant ERC721_INTERFACE_ID = type(IERC721).interfaceId;
-    bytes4 public constant ERC1155_INTERFACE_ID = type(IERC1155).interfaceId;
-    bytes4 public constant ERC1155B_INTERFACE_ID = type(ERC1155B).interfaceId;
+    bytes4 public constant IERC20_ID = type(IERC20).interfaceId;
+    bytes4 public constant IERC721_ID = type(IERC721).interfaceId;
+    bytes4 public constant IERC1155_ID = type(IERC1155).interfaceId;
+    bytes4 public constant ERC1155B_ID = type(ERC1155B).interfaceId;
 
     function uri(uint256) public pure override returns (string memory) {
         return "";
@@ -31,54 +31,6 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     mapping(uint256 => Pair) public pairs; /// pairId => Pair
     mapping(address => mapping(uint256 => uint256)) public enumeratedIds; /// token adddress => index => id held by Vault, balanceOf(address(this)) = current index
     mapping(address => uint128) public currentIndex; /// token address => current Index
-
-    function createPair(
-        address token0,
-        uint256 token0Id,
-        bytes4 token0InterfaceId,
-        address token1,
-        uint256 token1Id,
-        bytes4 token1InterfaceId,
-        ICurve invariant
-    ) external returns (uint256 pairId) {
-        if (token0 >= token1) {
-            require(token0 != token1, "token0 and token1 must be different");
-            /// sort tokens to prevent duplicates
-            (token1, token1Id, token1InterfaceId, token0, token0Id, token0InterfaceId) = (
-                token0,
-                token0Id,
-                token0InterfaceId,
-                token1,
-                token1Id,
-                token1InterfaceId
-            );
-        }
-
-        require(
-            token0.supportsInterface(token0InterfaceId),
-            "token0 does not support token0InterfaceId"
-        );
-        require(
-            token1.supportsInterface(token1InterfaceId),
-            "token1 does not support token1InterfaceId"
-        );
-
-        bytes memory pairData = abi.encode(
-            token0,
-            token0Id,
-            token0InterfaceId,
-            token1,
-            token1Id,
-            token1InterfaceId,
-            invariant
-        );
-        pairId = uint256(keccak256(pairData));
-
-        require(address(invariant).code.length != 0, "amm must be a contract");
-        require(pairs[pairId].reserve0 == 0 && pairs[pairId].reserve1 == 0, "pair already exists");
-
-        pairs[pairId] = Pair(0, 0);
-    }
 
     function addLiquidity(
         address to,
@@ -106,7 +58,9 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             pairData,
             (address, uint256, bytes4, address, uint256, bytes4, ICurve)
         );
+        require(token0 < token1, "tokens must be sorted");
 
+        require(address(invariant).code.length != 0, "amm must be a contract");
         k = invariant.addLiquidity(pair, token0Amount, token1Amount);
         pair.reserve0 += token0Amount;
         pair.reserve1 += token1Amount;
@@ -146,7 +100,8 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             pairData,
             (address, uint256, bytes4, address, uint256, bytes4, ICurve)
         );
-
+        require(token0 < token1, "tokens must be sorted");
+        require(address(invariant).code.length != 0, "amm must be a contract");
         (amount0Out, amount1Out) = invariant.removeLiquidity(pair, k);
         pair.reserve0 -= amount0Out;
         pair.reserve1 -= amount1Out;
@@ -183,8 +138,10 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             (address, uint256, bytes4, address, uint256, bytes4, ICurve)
         );
 
+        require(token0 < token1, "tokens must be sorted");
         require(tokenIn == token0 || tokenIn == token1, "invalid token");
 
+        require(address(invariant).code.length != 0, "amm must be a contract");
         (tokenOut, amountOut) = (tokenIn == token0)
             ? (token1, invariant.swap(pair.reserve0, pair.reserve1, amountIn))
             : (token0, invariant.swap(pair.reserve1, pair.reserve0, amountIn));
@@ -215,13 +172,13 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         ) = abi.decode(pairData, (address, uint256, bytes4, address, uint256, bytes4, ICurve));
 
         bytes4 interfaceId = (token == token0) ? token0InterfaceId : token1InterfaceId;
-        if (interfaceId == ERC20_INTERFACE_ID) {
+        if (interfaceId == IERC20_ID) {
             if (from == address(this)) {
                 token._performERC20Transfer(to, amount);
             } else {
                 token._performERC20TransferFrom(from, to, amount);
             }
-        } else if (interfaceId == ERC721_INTERFACE_ID) {
+        } else if (interfaceId == IERC721_ID) {
             if (from == address(this)) {
                 uint256 upper = IERC721(token).balanceOf(from);
                 uint256 lower = upper - amount;
@@ -238,10 +195,10 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
                     token._performERC721Transfer(from, to, tokenId);
                 }
             }
-        } else if (interfaceId == ERC1155_INTERFACE_ID) {
+        } else if (interfaceId == IERC1155_ID) {
             tokenId = (token == token0) ? token0Id : token1Id;
             token._performERC1155Transfer(from, to, tokenId, amount, transferData);
-        } else if (interfaceId == ERC1155B_INTERFACE_ID) {
+        } else if (interfaceId == ERC1155B_ID) {
             if (from == address(this)) {
                 uint256[] memory ids = new uint256[](uint256(amount));
                 uint256[] memory amounts = new uint256[](uint256(amount));
