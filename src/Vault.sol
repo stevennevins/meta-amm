@@ -30,7 +30,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
 
     mapping(uint256 => Pair) public pairs; /// pairId => Pair
     mapping(address => mapping(uint256 => uint256)) public enumeratedIds; /// token adddress => index => id held by Vault, balanceOf(address(this)) = current index
-    mapping(address => uint128) public currentIndex; /// token address => current Index
+    mapping(address => uint128) public currentIndex; /// for ERC1155B: token address => current Index
 
     function addLiquidity(
         address to,
@@ -41,7 +41,34 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         bytes calldata transferData
     ) external returns (uint128 k) {
         k = _addLiquidity(to, token0Amount, token1Amount, pairData, transferData);
+
         require(k >= minK, "liquidity must be greater than minK liquidity");
+    }
+
+    function removeLiquidity(
+        address from,
+        uint128 k,
+        uint128 minAmount0Out,
+        uint128 minAmount1Out,
+        bytes calldata pairData
+    ) external returns (uint128 amount0Out, uint128 amount1Out) {
+        (amount0Out, amount1Out) = _removeLiquidity(from, k, pairData);
+
+        require(amount0Out >= minAmount0Out, "amountOut must be greater than minAmountOut");
+        require(amount1Out >= minAmount1Out, "amountOut must be greater than minAmountOut");
+    }
+
+    function swap(
+        address to,
+        address tokenIn,
+        uint128 amountIn,
+        uint128 minAmountOut,
+        bytes calldata pairData,
+        bytes calldata transferData
+    ) external returns (address tokenOut, uint128 amountOut) {
+        (tokenOut, amountOut) = _swap(to, tokenIn, amountIn, pairData, transferData);
+
+        require(amountOut >= minAmountOut, "amountOut must be greater than minAmountOut");
     }
 
     function _addLiquidity(
@@ -75,19 +102,6 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         _transfer(token1, to, address(this), token1Amount, pairData, token1Data);
     }
 
-    function removeLiquidity(
-        address from,
-        uint128 k,
-        uint128 minAmount0Out,
-        uint128 minAmount1Out,
-        bytes calldata pairData
-    ) external returns (uint128 amount0Out, uint128 amount1Out) {
-        (amount0Out, amount1Out) = _removeLiquidity(from, k, pairData);
-
-        require(amount0Out >= minAmount0Out, "amountOut must be greater than minAmountOut");
-        require(amount1Out >= minAmount1Out, "amountOut must be greater than minAmountOut");
-    }
-
     function _removeLiquidity(
         address from,
         uint128 k,
@@ -109,19 +123,6 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         _burn(from, pairId, k);
         _transfer(token0, address(this), from, amount0Out, pairData, "");
         _transfer(token1, address(this), from, amount1Out, pairData, "");
-    }
-
-    function swap(
-        address to,
-        address tokenIn,
-        uint128 amountIn,
-        uint128 minAmountOut,
-        bytes calldata pairData,
-        bytes calldata transferData
-    ) external returns (address tokenOut, uint128 amountOut) {
-        (tokenOut, amountOut) = _swap(to, tokenIn, amountIn, pairData, transferData);
-
-        require(amountOut >= minAmountOut, "amountOut must be greater than minAmountOut");
     }
 
     function _swap(
