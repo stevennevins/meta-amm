@@ -54,22 +54,12 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             );
         }
 
-        /// maybe delegate this to the AMM contract? where the AMM says what tokenInterfaces it accepts
-        /// and then we also just check the token supports that interface Id
         require(
-            (token0InterfaceId == ERC20_INTERFACE_ID ||
-                token0InterfaceId == ERC721_INTERFACE_ID ||
-                token0InterfaceId == ERC1155_INTERFACE_ID ||
-                token0InterfaceId == ERC1155B_INTERFACE_ID) &&
-                token0.supportsInterface(token0InterfaceId),
+            token0.supportsInterface(token0InterfaceId),
             "token0 does not support token0InterfaceId"
         );
         require(
-            (token1InterfaceId == ERC20_INTERFACE_ID ||
-                token1InterfaceId == ERC721_INTERFACE_ID ||
-                token1InterfaceId == ERC1155_INTERFACE_ID ||
-                token1InterfaceId == ERC1155B_INTERFACE_ID) &&
-                token1.supportsInterface(token1InterfaceId),
+            token1.supportsInterface(token1InterfaceId),
             "token1 does not support token1InterfaceId"
         );
 
@@ -231,9 +221,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             } else {
                 token._performERC20TransferFrom(from, to, amount);
             }
-            return;
-        }
-        if (interfaceId == ERC721_INTERFACE_ID) {
+        } else if (interfaceId == ERC721_INTERFACE_ID) {
             if (from == address(this)) {
                 uint256 upper = IERC721(token).balanceOf(from);
                 uint256 lower = upper - amount;
@@ -250,18 +238,11 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
                     token._performERC721Transfer(from, to, tokenId);
                 }
             }
-            return;
-        }
-        if (interfaceId == ERC1155_INTERFACE_ID) {
+        } else if (interfaceId == ERC1155_INTERFACE_ID) {
             tokenId = (token == token0) ? token0Id : token1Id;
             token._performERC1155Transfer(from, to, tokenId, amount, transferData);
-            return;
-        }
-        if (interfaceId == ERC1155B_INTERFACE_ID) {
+        } else if (interfaceId == ERC1155B_INTERFACE_ID) {
             if (from == address(this)) {
-                /// that sequential fixed sized array storage access post might still be useful here
-                // (, uint256 memory amounts) = abi.decode(transferData, (uint256[], uint256[]));
-
                 uint256[] memory ids = new uint256[](uint256(amount));
                 uint256[] memory amounts = new uint256[](uint256(amount));
                 uint256 upper = currentIndex[token];
@@ -283,12 +264,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
                 currentIndex[token] += uint128(length);
                 token._performERC1155BatchTransfer(from, to, ids, amounts, "");
             }
-            return;
-        }
-
-        /// also would be nice to add 1155B support
-        /// can try and catch if supports interface isn't supported and then revert
-        revert("token must support ERC20, ERC721, or ERC1155");
+        } else revert("token must support ERC20, ERC721, or ERC1155");
     }
 
     /// @notice Handles the receipt of a single ERC1155 token type
