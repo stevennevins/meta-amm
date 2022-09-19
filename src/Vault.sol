@@ -9,9 +9,6 @@ import {TransferLib} from "./lib/TransferLib.sol";
 /// a minimalistic meta AMM
 contract Vault is ERC1155, ERC1155TokenReceiver {
     using TransferLib for address;
-    /// metadata stuff for 1155
-    string public constant name = "";
-    string public constant symbol = "";
 
     function uri(uint256) public pure override returns (string memory) {
         return "";
@@ -36,7 +33,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     ) external returns (uint128 k) {
         k = _addLiquidity(to, token0Amount, token1Amount, pairData);
 
-        require(k >= minK, "liquidity must be greater than minK liquidity");
+        require(k >= minK, "K < minK");
     }
 
     function removeLiquidity(
@@ -48,8 +45,8 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     ) external returns (uint128 amount0Out, uint128 amount1Out) {
         (amount0Out, amount1Out) = _removeLiquidity(from, k, pairData);
 
-        require(amount0Out >= minAmount0Out, "amountOut must be greater than minAmountOut");
-        require(amount1Out >= minAmount1Out, "amountOut must be greater than minAmountOut");
+        require(amount0Out >= minAmount0Out, "amountOut < minAmountOut");
+        require(amount1Out >= minAmount1Out, "amountOut < minAmountOut");
     }
 
     function swap(
@@ -61,7 +58,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
     ) external returns (address tokenOut, uint128 amountOut) {
         (tokenOut, amountOut) = _swap(to, tokenIn, amountIn, pairData);
 
-        require(amountOut >= minAmountOut, "amountOut must be greater than minAmountOut");
+        require(amountOut >= minAmountOut, "amountOut < minAmountOut");
     }
 
     function _addLiquidity(
@@ -77,7 +74,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             pairData,
             (address, uint256, address, uint256, ICurve)
         );
-        require(token0 < token1, "tokens must be sorted");
+        require(token0 < token1, "token0 > token1");
 
         require(address(invariant).code.length != 0, "amm must be a contract");
         k = invariant.addLiquidity(pair, token0Amount, token1Amount);
@@ -101,7 +98,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             pairData,
             (address, uint256, address, uint256, ICurve)
         );
-        require(token0 < token1, "tokens must be sorted");
+        require(token0 < token1, "token0 > token1");
         require(address(invariant).code.length != 0, "amm must be a contract");
         (amount0Out, amount1Out) = invariant.removeLiquidity(pair, k);
         pair.reserve0 -= amount0Out;
@@ -125,7 +122,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             (address, uint256, address, uint256, ICurve)
         );
 
-        require(token0 < token1, "tokens must be sorted");
+        require(token0 < token1, "token0 > token1");
         require(tokenIn == token0 || tokenIn == token1, "invalid token");
 
         require(address(invariant).code.length != 0, "amm must be a contract");
