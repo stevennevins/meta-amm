@@ -44,7 +44,7 @@ contract VaultERC1155Test is Test {
         Pair memory pair = Pair(Asset(address(token0), 1), Asset(address(token1), 1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.addLiquidity(address(0xBEEF), 1 gwei, 1 gwei, 1, pair);
+        vault.addLiquidity(address(0xBEEF), 1 gwei, 1 gwei, pair);
         assertEq(token0.balanceOf(address(vault), 1), 1 gwei);
         assertEq(token1.balanceOf(address(vault), 1), 1 gwei);
     }
@@ -55,7 +55,7 @@ contract VaultERC1155Test is Test {
         Pair memory pair = Pair(Asset(address(token0), 1), Asset(address(token1), 1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.swap(address(0xBEEF), Asset(address(token0), 1), 0.5 gwei, 1, pair);
+        vault.swap(address(0xBEEF), Asset(address(token0), 1), 0.5 gwei, pair);
     }
 
     function testRemoveLiquidity() public {
@@ -63,6 +63,6 @@ contract VaultERC1155Test is Test {
         Pair memory pair = Pair(Asset(address(token0), 1), Asset(address(token1), 1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.removeLiquidity(address(0xBEEF), 1 gwei * 1 gwei - 1000, 1, 1, pair);
+        vault.removeLiquidity(address(0xBEEF), 1 gwei * 1 gwei - 1000, pair);
     }
 }

@@ -34,53 +34,42 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         address to,
         uint128 asset0Amount,
         uint128 asset1Amount,
-        uint128 minK,
         Pair calldata pair
-    ) external returns (uint128 k) {
-        k = _addLiquidity(to, asset0Amount, asset1Amount, pair);
-
-        require(k >= minK, "K < minK");
+    ) external returns (uint128) {
+        return _addLiquidity(to, asset0Amount, asset1Amount, pair);
     }
 
     function wrapERC20(
         address to,
         Asset calldata asset,
         uint128 amount
-    ) external returns (uint128 k) {
-        k = _wrapERC20(to, asset, amount);
+    ) external returns (uint128) {
+        return _wrapERC20(to, asset, amount);
     }
 
     function unwrapERC20(
         address to,
         Asset calldata asset,
         uint128 k
-    ) external returns (uint128 amountOut) {
-        amountOut = _unwrapERC20(to, asset, k);
+    ) external returns (uint128) {
+        return _unwrapERC20(to, asset, k);
     }
 
     function removeLiquidity(
         address from,
         uint128 k,
-        uint128 minAmount0Out,
-        uint128 minAmount1Out,
         Pair calldata pair
-    ) external returns (uint128 amount0Out, uint128 amount1Out) {
-        (amount0Out, amount1Out) = _unwrapLiquidity(from, k, pair);
-
-        require(amount0Out >= minAmount0Out, "amountOut < minAmountOut");
-        require(amount1Out >= minAmount1Out, "amountOut < minAmountOut");
+    ) external returns (uint128, uint128) {
+        return _removeLiquidity(from, k, pair);
     }
 
     function swap(
         address to,
         Asset calldata assetIn,
         uint128 amountIn,
-        uint128 minAmountOut,
         Pair calldata pair
-    ) external returns (Asset memory assetOut, uint128 amountOut) {
-        (assetOut, amountOut) = _swap(to, assetIn, amountIn, pair);
-
-        require(amountOut >= minAmountOut, "amountOut < minAmountOut");
+    ) external returns (Asset memory, uint128) {
+        return _swap(to, assetIn, amountIn, pair);
     }
 
     function _addLiquidity(
@@ -104,7 +93,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         _mint(to, pairId, k, "");
     }
 
-    function _unwrapLiquidity(
+    function _removeLiquidity(
         address from,
         uint128 k,
         Pair calldata pair
