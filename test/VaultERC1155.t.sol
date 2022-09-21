@@ -13,7 +13,6 @@ contract VaultERC1155Test is Test {
     MockERC1155 public token0;
     MockERC1155 public token1;
     uint256 public computedPairId;
-    Pair public pair;
 
     function setUp() public {
         vault = new Vault();

@@ -8,32 +8,26 @@ contract XtYK is ICurve {
     uint128 public constant MIN_LP = 10**3;
 
     function addLiquidity(
-        Reserves memory reserves,
-        uint128 token0Amount,
-        uint128 token1Amount
+        Reserves calldata reserves,
+        uint128 amount0,
+        uint128 amount1
     ) external pure returns (uint128 k) {
-        uint128 reserve0 = reserves.reserve0;
-        uint128 reserve1 = reserves.reserve1;
-
+        (uint128 reserve0, uint128 reserve1) = (reserves.reserve0, reserves.reserve1);
         uint128 totalK = reserve0 * reserve1;
 
-        if (totalK == 0) {
-            k = token0Amount * token1Amount - MIN_LP;
-        } else {
-            k = _min((token0Amount * totalK) / reserve0, (token1Amount * totalK) / reserve1);
-        }
+        k = totalK == 0
+            ? amount0 * amount1 - MIN_LP
+            : _min((amount0 * totalK) / reserve0, (amount1 * totalK) / reserve1);
 
         require(k != 0, "insufficient K");
     }
 
-    function removeLiquidity(Reserves memory reserves, uint128 k)
+    function removeLiquidity(Reserves calldata reserves, uint128 k)
         external
         pure
         returns (uint128 amount0Out, uint128 amount1Out)
     {
-        uint128 reserve0 = reserves.reserve0;
-        uint128 reserve1 = reserves.reserve1;
-
+        (uint128 reserve0, uint128 reserve1) = (reserves.reserve0, reserves.reserve1);
         uint128 totalK = reserve0 * reserve1;
 
         amount0Out = (k * reserve0) / totalK;
@@ -46,16 +40,16 @@ contract XtYK is ICurve {
         uint128 reserveIn,
         uint128 reserveOut,
         uint128 amountIn
-    ) external pure returns (uint128 amountOut) {
-        amountOut = _getAmountOut(amountIn, reserveIn, reserveOut);
+    ) external pure returns (uint128) {
+        return _getAmountOut(amountIn, reserveIn, reserveOut);
     }
 
     function _getAmountOut(
         uint128 amountIn,
         uint128 reserveAmountIn,
         uint128 reserveAmountOut
-    ) internal pure returns (uint128 amountOut) {
-        amountOut = (amountIn * reserveAmountOut) / reserveAmountIn;
+    ) internal pure returns (uint128) {
+        return (amountIn * reserveAmountOut) / reserveAmountIn;
     }
 
     function _min(uint128 x, uint128 y) private pure returns (uint128 z) {
