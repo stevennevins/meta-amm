@@ -42,20 +42,20 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         require(k >= minK, "K < minK");
     }
 
-    function addInternalBalance(
+    function wrapERC20(
         address to,
         Asset calldata asset,
         uint128 amount
     ) external returns (uint128 k) {
-        k = _addInternalBalance(to, asset, amount);
+        k = _wrapERC20(to, asset, amount);
     }
 
-    function removeInternalBalance(
+    function unwrapERC20(
         address to,
         Asset calldata asset,
         uint128 k
     ) external returns (uint128 amountOut) {
-        amountOut = _removeInternalBalance(to, asset, k);
+        amountOut = _unwrapERC20(to, asset, k);
     }
 
     function removeLiquidity(
@@ -65,7 +65,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         uint128 minAmount1Out,
         Pair calldata pair
     ) external returns (uint128 amount0Out, uint128 amount1Out) {
-        (amount0Out, amount1Out) = _removeLiquidity(from, k, pair);
+        (amount0Out, amount1Out) = _unwrapLiquidity(from, k, pair);
 
         require(amount0Out >= minAmount0Out, "amountOut < minAmountOut");
         require(amount1Out >= minAmount1Out, "amountOut < minAmountOut");
@@ -104,7 +104,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         _mint(to, pairId, k, "");
     }
 
-    function _removeLiquidity(
+    function _unwrapLiquidity(
         address from,
         uint128 k,
         Pair calldata pair
@@ -113,7 +113,6 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         Reserves storage reserves = reserves[pairId];
 
         require(pair.asset0.token < pair.asset1.token, "asset0 > asset1");
-        require(pair.invariant.code.length != 0, "amm must be a contract");
         (amount0Out, amount1Out) = ICurve(pair.invariant).removeLiquidity(reserves, k);
         reserves.reserve0 -= amount0Out;
         reserves.reserve1 -= amount1Out;
@@ -123,26 +122,38 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         pair.asset1._ERC1155Transfer(address(this), from, amount1Out);
     }
 
-    function _addInternalBalance(
+    function _wrapERC721(
+        address from,
+        Asset calldata asset,
+        uint256[] calldata ids
+    ) internal returns (uint128) {}
+
+    function _unwrapERC721(
+        address from,
+        Asset calldata asset,
+        uint256[] calldata ids
+    ) internal returns (uint128) {}
+
+    function _wrapERC20(
         address from,
         Asset calldata asset,
         uint128 amount
-    ) internal returns (uint128 k) {
+    ) internal returns (uint128) {
         uint256 pairId = uint256(keccak256(abi.encode(Pair(asset, NULL_ASSET, address(0)))));
-        k = amount;
         asset._ERC20TransferFrom(from, address(this), amount);
         _mint(from, pairId, amount, "");
+        return amount;
     }
 
-    function _removeInternalBalance(
+    function _unwrapERC20(
         address from,
         Asset calldata asset,
         uint128 k
-    ) internal returns (uint128 amountOut) {
+    ) internal returns (uint128) {
         uint256 pairId = uint256(keccak256(abi.encode(Pair(asset, NULL_ASSET, address(0)))));
-        amountOut = k;
         asset._ERC20Transfer(from, k);
         _burn(from, pairId, k);
+        return k;
     }
 
     function _swap(
@@ -158,8 +169,6 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
             assetIn.token == pair.asset0.token || assetIn.token == pair.asset1.token,
             "invalid token"
         );
-
-        require(pair.invariant.code.length != 0, "amm must be a contract");
         (assetOut, amountOut) = (assetIn.token == pair.asset0.token)
             ? (
                 pair.asset1,

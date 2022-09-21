@@ -114,7 +114,7 @@ library TransferLib {
      * @param amount     The amount to transfer.
      */
     function _ERC20Transfer(
-        Asset memory asset,
+        Asset calldata asset,
         address to,
         uint128 amount
     ) internal {
@@ -142,7 +142,7 @@ library TransferLib {
      * @param amount     The amount to transfer.
      */
     function _ERC20TransferFrom(
-        Asset memory asset,
+        Asset calldata asset,
         address from,
         address to,
         uint128 amount
@@ -173,7 +173,7 @@ library TransferLib {
      * @param amount     The amount to transfer.
      */
     function _ERC1155Transfer(
-        Asset memory asset,
+        Asset calldata asset,
         address from,
         address to,
         uint128 amount
