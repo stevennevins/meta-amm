@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {ICurve, Pair} from "../interfaces/ICurve.sol";
+import {ICurve, Reserves} from "../interfaces/ICurve.sol";
 import "forge-std/Test.sol";
 
 contract XtYK is ICurve {
     uint128 public constant MIN_LP = 10**3;
 
     function addLiquidity(
-        Pair memory pair,
+        Reserves memory reserves,
         uint128 token0Amount,
         uint128 token1Amount
     ) external pure returns (uint128 k) {
-        uint128 reserve0 = pair.reserve0;
-        uint128 reserve1 = pair.reserve1;
+        uint128 reserve0 = reserves.reserve0;
+        uint128 reserve1 = reserves.reserve1;
 
         uint128 totalK = reserve0 * reserve1;
 
@@ -26,13 +26,13 @@ contract XtYK is ICurve {
         require(k != 0, "insufficient K");
     }
 
-    function removeLiquidity(Pair memory pair, uint128 k)
+    function removeLiquidity(Reserves memory reserves, uint128 k)
         external
         pure
         returns (uint128 amount0Out, uint128 amount1Out)
     {
-        uint128 reserve0 = pair.reserve0;
-        uint128 reserve1 = pair.reserve1;
+        uint128 reserve0 = reserves.reserve0;
+        uint128 reserve1 = reserves.reserve1;
 
         uint128 totalK = reserve0 * reserve1;
 

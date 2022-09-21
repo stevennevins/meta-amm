@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {MockERC1155} from "./mocks/MockERC1155.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import "../src/Vault.sol";
-import "../src/invariants/XtYK.sol";
+import {XtYK} from "../src/invariants/XtYK.sol";
 
 contract VaultERC1155Test is Test {
     Vault public vault;
@@ -13,6 +13,7 @@ contract VaultERC1155Test is Test {
     MockERC1155 public token0;
     MockERC1155 public token1;
     uint256 public computedPairId;
+    Pair public pair;
 
     function setUp() public {
         vault = new Vault();
@@ -27,47 +28,41 @@ contract VaultERC1155Test is Test {
         vm.stopPrank();
     }
 
-    function testCreatePairERC1155ERC1155() public {
+    function testCreatePair() public {
         assertTrue(address(token0) < address(token1));
 
         computedPairId = uint256(
-            keccak256(abi.encode(address(token0), 1, address(token1), 1, address(xyk)))
+            keccak256(
+                abi.encode(Pair(Asset(address(token0), 1), Asset(address(token1), 1), address(xyk)))
+            )
         );
     }
 
-    function testAddLiquidityERC1155ERC1155() public {
-        testCreatePairERC1155ERC1155();
+    function testAddLiquidity() public {
+        testCreatePair();
 
-        bytes memory pairData = abi.encode(address(token0), 1, address(token1), 1, address(xyk));
+        Pair memory pair = Pair(Asset(address(token0), 1), Asset(address(token1), 1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.addLiquidity(address(0xBEEF), 1 gwei, 1 gwei, 1, pairData);
+        vault.addLiquidity(address(0xBEEF), 1 gwei, 1 gwei, 1, pair);
         assertEq(token0.balanceOf(address(vault), 1), 1 gwei);
         assertEq(token1.balanceOf(address(vault), 1), 1 gwei);
     }
 
-    function testSwapERC20toERC1155() public {
-        testAddLiquidityERC1155ERC1155();
+    function testSwap() public {
+        testAddLiquidity();
 
-        bytes memory pairData = abi.encode(address(token0), 1, address(token1), 1, address(xyk));
+        Pair memory pair = Pair(Asset(address(token0), 1), Asset(address(token1), 1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.swap(address(0xBEEF), address(token1), 0.5 gwei, 1, pairData);
+        vault.swap(address(0xBEEF), Asset(address(token0), 1), 0.5 gwei, 1, pair);
     }
 
-    function testSwapERC1155toERC1155() public {
-        testAddLiquidityERC1155ERC1155();
-        bytes memory pairData = abi.encode(address(token0), 1, address(token1), 1, address(xyk));
+    function testRemoveLiquidity() public {
+        testAddLiquidity();
+        Pair memory pair = Pair(Asset(address(token0), 1), Asset(address(token1), 1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.swap(address(0xBEEF), address(token0), 0.5 gwei, 0, pairData);
-    }
-
-    function testRemoveLiquidityERC20() public {
-        testAddLiquidityERC1155ERC1155();
-        bytes memory pairData = abi.encode(address(token0), 1, address(token1), 1, address(xyk));
-
-        vm.prank(address(0xBEEF));
-        vault.removeLiquidity(address(0xBEEF), 1 gwei * 1 gwei - 1000, 1, 1, pairData);
+        vault.removeLiquidity(address(0xBEEF), 1 gwei * 1 gwei - 1000, 1, 1, pair);
     }
 }
