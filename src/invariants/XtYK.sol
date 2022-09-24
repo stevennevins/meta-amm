@@ -11,29 +11,25 @@ contract XtYK is ICurve {
         Reserves calldata reserves,
         uint128 amount0,
         uint128 amount1
-    ) external pure returns (uint128 k) {
+    ) external pure returns (uint128) {
         (uint128 reserve0, uint128 reserve1) = (reserves.reserve0, reserves.reserve1);
         uint128 totalK = reserve0 * reserve1;
 
-        k = totalK == 0
-            ? amount0 * amount1 - MIN_LP
-            : _min((amount0 * totalK) / reserve0, (amount1 * totalK) / reserve1);
+        if (totalK > 0) return _min((amount0 * totalK) / reserve0, (amount1 * totalK) / reserve1);
+        uint128 k = amount0 * amount1;
+        require(k > MIN_LP, "k too low");
 
-        require(k != 0, "insufficient K");
+        return k;
     }
 
     function removeLiquidity(Reserves calldata reserves, uint128 k)
         external
         pure
-        returns (uint128 amount0Out, uint128 amount1Out)
+        returns (uint128, uint128)
     {
         (uint128 reserve0, uint128 reserve1) = (reserves.reserve0, reserves.reserve1);
         uint128 totalK = reserve0 * reserve1;
-
-        amount0Out = (k * reserve0) / totalK;
-        amount1Out = (k * reserve1) / totalK;
-
-        require(amount0Out != 0 && amount1Out != 0, "insufficient K");
+        return ((k * reserve0) / totalK, (k * reserve1) / totalK);
     }
 
     function swap(

@@ -3,15 +3,17 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import {MockERC1155} from "./mocks/MockERC1155.sol";
+import {MockERC721} from "./mocks/MockERC721.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import "../src/Vault.sol";
 import {XtYK} from "../src/invariants/XtYK.sol";
 
-contract VaultERC1155Test is Test {
+contract VaultTest is Test {
     Vault public vault;
     XtYK public xyk;
     MockERC1155 public token0;
     MockERC1155 public token1;
+    MockERC721 public nft;
     uint256 public computedPairId;
 
     function setUp() public {
@@ -19,6 +21,9 @@ contract VaultERC1155Test is Test {
         xyk = new XtYK();
         token0 = new MockERC1155();
         token1 = new MockERC1155();
+        nft = new MockERC721("", "");
+        nft.mint(address(0xBEEF), 1);
+        nft.mint(address(0xBEEF), 2);
         token0.mint(address(0xBEEF), 1, type(uint128).max);
         token1.mint(address(0xBEEF), 1, type(uint128).max);
         vm.startPrank(address(0xBEEF));

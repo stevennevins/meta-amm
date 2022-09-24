@@ -3,32 +3,21 @@ pragma solidity ^0.8.0;
 
 import {ERC1155, ERC1155TokenReceiver} from "solmate/tokens/ERC1155.sol";
 
+import {AssetWrapper} from "./AssetWrapper.sol";
+
 import {ICurve} from "./interfaces/ICurve.sol";
 import {TransferLib} from "./lib/TransferLib.sol";
 import {Reserves, Asset, Pair} from "./lib/ReserveStructs.sol";
 
 /// a minimalistic meta AMM
-contract Vault is ERC1155, ERC1155TokenReceiver {
-    using TransferLib for address;
+contract Vault is AssetWrapper, ERC1155, ERC1155TokenReceiver {
     using TransferLib for Asset;
-
-    Asset public NULL_ASSET = Asset(address(0), 0);
 
     function uri(uint256) public pure override returns (string memory) {
         return "";
     }
 
-    mapping(uint256 => Reserves) public reserves; /// pairId => Reserves
-    /// we should already have for fungibles with the amount of k
-    /// mapping(address => mapping(uint256 => uint256)) public balance;
-
-    /// I think the sauce will be allowing people to scope their own ids
-    /// maybe let people deposit to a Reserve where the hash is based on the address
-    /// they're giving controll over their ids ie either Jitty or themselves
-
-    mapping(address => mapping(uint256 => uint256)) public enumeratedIds; /// token address => index => id held by Vault, balanceOf(address(this)) = current index
-    mapping(address => mapping(address => mapping(uint256 => uint256))) public userEnumeratedIds; /// token address => index => id held by Vault, balanceOf(address(this)) = current index
-    mapping(address => uint128) public currentIndex; /// for ERC1155B: token address => current Index
+    mapping(uint256 => Reserves) public pairReserves; /// pairId => Reserves
 
     function addLiquidity(
         address to,
@@ -37,22 +26,6 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         Pair calldata pair
     ) external returns (uint128) {
         return _addLiquidity(to, asset0Amount, asset1Amount, pair);
-    }
-
-    function wrapERC20(
-        address to,
-        Asset calldata asset,
-        uint128 amount
-    ) external returns (uint128) {
-        return _wrapERC20(to, asset, amount);
-    }
-
-    function unwrapERC20(
-        address to,
-        Asset calldata asset,
-        uint128 k
-    ) external returns (uint128) {
-        return _unwrapERC20(to, asset, k);
     }
 
     function removeLiquidity(
@@ -79,7 +52,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         Pair calldata pair
     ) internal returns (uint128 k) {
         uint256 pairId = uint256(keccak256(abi.encode(pair)));
-        Reserves storage reserves = reserves[pairId];
+        Reserves storage reserves = pairReserves[pairId];
 
         require(pair.asset0.token < pair.asset1.token, "asset0 > asset1");
 
@@ -87,8 +60,8 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         reserves.reserve0 += asset0Amount;
         reserves.reserve1 += asset1Amount;
 
-        pair.asset0._ERC1155Transfer(to, address(this), asset0Amount);
-        pair.asset1._ERC1155Transfer(to, address(this), asset1Amount);
+        pair.asset0._transferERC1155(to, address(this), asset0Amount);
+        pair.asset1._transferERC1155(to, address(this), asset1Amount);
 
         _mint(to, pairId, k, "");
     }
@@ -99,7 +72,7 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         Pair calldata pair
     ) internal returns (uint128 amount0Out, uint128 amount1Out) {
         uint256 pairId = uint256(keccak256(abi.encode(pair)));
-        Reserves storage reserves = reserves[pairId];
+        Reserves storage reserves = pairReserves[pairId];
 
         require(pair.asset0.token < pair.asset1.token, "asset0 > asset1");
         (amount0Out, amount1Out) = ICurve(pair.invariant).removeLiquidity(reserves, k);
@@ -107,42 +80,8 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         reserves.reserve1 -= amount1Out;
 
         _burn(from, pairId, k);
-        pair.asset0._ERC1155Transfer(address(this), from, amount0Out);
-        pair.asset1._ERC1155Transfer(address(this), from, amount1Out);
-    }
-
-    function _wrapERC721(
-        address from,
-        Asset calldata asset,
-        uint256[] calldata ids
-    ) internal returns (uint128) {}
-
-    function _unwrapERC721(
-        address from,
-        Asset calldata asset,
-        uint256[] calldata ids
-    ) internal returns (uint128) {}
-
-    function _wrapERC20(
-        address from,
-        Asset calldata asset,
-        uint128 amount
-    ) internal returns (uint128) {
-        uint256 pairId = uint256(keccak256(abi.encode(Pair(asset, NULL_ASSET, address(0)))));
-        asset._ERC20TransferFrom(from, address(this), amount);
-        _mint(from, pairId, amount, "");
-        return amount;
-    }
-
-    function _unwrapERC20(
-        address from,
-        Asset calldata asset,
-        uint128 k
-    ) internal returns (uint128) {
-        uint256 pairId = uint256(keccak256(abi.encode(Pair(asset, NULL_ASSET, address(0)))));
-        asset._ERC20Transfer(from, k);
-        _burn(from, pairId, k);
-        return k;
+        pair.asset0._transferERC1155(address(this), from, amount0Out);
+        pair.asset1._transferERC1155(address(this), from, amount1Out);
     }
 
     function _swap(
@@ -152,30 +91,32 @@ contract Vault is ERC1155, ERC1155TokenReceiver {
         Pair calldata pair
     ) internal returns (Asset memory assetOut, uint128 amountOut) {
         uint256 pairId = uint256(keccak256(abi.encode(pair)));
-        Reserves storage reserves = reserves[pairId];
-        require(pair.asset0.token < pair.asset1.token, "asset0 > asset1");
-        require(
-            assetIn.token == pair.asset0.token || assetIn.token == pair.asset1.token,
-            "invalid token"
-        );
-        (assetOut, amountOut) = (assetIn.token == pair.asset0.token)
-            ? (
-                pair.asset1,
-                ICurve(pair.invariant).swap(reserves.reserve0, reserves.reserve1, amountIn)
-            )
-            : (
-                pair.asset0,
-                ICurve(pair.invariant).swap(reserves.reserve1, reserves.reserve0, amountIn)
-            );
+        Reserves storage reserves = pairReserves[pairId];
+        if (assetIn.token == pair.asset0.token) {
+            amountOut = ICurve(pair.invariant).swap(reserves.reserve0, reserves.reserve1, amountIn);
+            (reserves.reserve0 += amountIn, reserves.reserve1 -= amountOut, assetOut = pair.asset1);
+        } else if (assetIn.token == pair.asset1.token) {
+            amountOut = ICurve(pair.invariant).swap(reserves.reserve1, reserves.reserve0, amountIn);
+            (reserves.reserve0 -= amountOut, reserves.reserve1 += amountIn, assetOut = pair.asset0);
+        }
+        assetIn._transferERC1155(to, address(this), amountIn);
+        assetOut._transferERC1155(address(this), to, amountOut);
+    }
 
-        /// #TODO
-        /// missing reserve update for asset1
-        (pair.asset0.token == assetIn.token)
-            ? reserves.reserve0 += amountIn
-            : reserves.reserve0 -= amountOut;
+    function _afterWrap(
+        address to,
+        uint256 id,
+        uint256 amount
+    ) internal override {
+        _mint(to, id, amount, "");
+    }
 
-        assetIn.token._ERC1155Transfer(to, address(this), assetIn.identifier, amountIn);
-        assetOut.token._ERC1155Transfer(address(this), to, assetOut.identifier, amountOut);
+    function _afterUnwrap(
+        address from,
+        uint256 id,
+        uint256 amount
+    ) internal override {
+        _burn(from, id, amount);
     }
 
     /// @notice Handles the receipt of a single ERC1155 token type
