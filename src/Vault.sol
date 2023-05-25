@@ -1,18 +1,58 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {ERC1155, ERC1155TokenReceiver} from "solmate/tokens/ERC1155.sol";
-
-import {AssetWrapper} from "./AssetWrapper.sol";
+import {ERC1155} from "solmate/tokens/ERC1155.sol";
 
 import {ICurve} from "./interfaces/ICurve.sol";
-import {TransferLib} from "./lib/TransferLib.sol";
-import {Reserves, Asset, Pair} from "./lib/ReserveStructs.sol";
+import {Reserves, Pair} from "./lib/ReserveStructs.sol";
+
+/// @dev Interface of the ERC20 standard as defined in the EIP.
+/// @dev This includes the optional name, symbol, and decimals metadata.
+interface IERC20 {
+    /// @dev Emitted when `value` tokens are moved from one account (`from`) to another (`to`).
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    /// @dev Emitted when the allowance of a `spender` for an `owner` is set, where `value`
+    /// is the new allowance.
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    /// @notice Returns the amount of tokens in existence.
+    function totalSupply() external view returns (uint256);
+
+    /// @notice Returns the amount of tokens owned by `account`.
+    function balanceOf(address account) external view returns (uint256);
+
+    /// @notice Moves `amount` tokens from the caller's account to `to`.
+    function transfer(address to, uint256 amount) external returns (bool);
+
+    /// @notice Returns the remaining number of tokens that `spender` is allowed
+    /// to spend on behalf of `owner`
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    /// @notice Sets `amount` as the allowance of `spender` over the caller's tokens.
+    /// @dev Be aware of front-running risks: https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+    function approve(address spender, uint256 amount) external returns (bool);
+
+    /// @notice Moves `amount` tokens from `from` to `to` using the allowance mechanism.
+    /// `amount` is then deducted from the caller's allowance.
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) external returns (bool);
+
+    /// @notice Returns the name of the token.
+    function name() external view returns (string memory);
+
+    /// @notice Returns the symbol of the token.
+    function symbol() external view returns (string memory);
+
+    /// @notice Returns the decimals places of the token.
+    function decimals() external view returns (uint8);
+}
 
 /// a minimalistic meta AMM
-contract Vault is AssetWrapper, ERC1155, ERC1155TokenReceiver {
-    using TransferLib for Asset;
-
+contract Vault is ERC1155 {
     function uri(uint256) public pure override returns (string memory) {
         return "";
     }
@@ -21,11 +61,11 @@ contract Vault is AssetWrapper, ERC1155, ERC1155TokenReceiver {
 
     function addLiquidity(
         address to,
-        uint128 asset0Amount,
-        uint128 asset1Amount,
+        uint128 token0Amount,
+        uint128 token1Amount,
         Pair calldata pair
     ) external returns (uint128) {
-        return _addLiquidity(to, asset0Amount, asset1Amount, pair);
+        return _addLiquidity(to, token0Amount, token1Amount, pair);
     }
 
     function removeLiquidity(
@@ -38,30 +78,30 @@ contract Vault is AssetWrapper, ERC1155, ERC1155TokenReceiver {
 
     function swap(
         address to,
-        Asset calldata assetIn,
+        address tokenIn,
         uint128 amountIn,
         Pair calldata pair
-    ) external returns (Asset memory, uint128) {
-        return _swap(to, assetIn, amountIn, pair);
+    ) external returns (address, uint128) {
+        return _swap(to, tokenIn, amountIn, pair);
     }
 
     function _addLiquidity(
         address to,
-        uint128 asset0Amount,
-        uint128 asset1Amount,
+        uint128 token0Amount,
+        uint128 token1Amount,
         Pair calldata pair
     ) internal returns (uint128 k) {
         uint256 pairId = uint256(keccak256(abi.encode(pair)));
         Reserves storage reserves = pairReserves[pairId];
 
-        require(pair.asset0.token < pair.asset1.token, "asset0 > asset1");
+        require(pair.token0 < pair.token1, "token0 > token1");
 
-        k = ICurve(pair.invariant).addLiquidity(reserves, asset0Amount, asset1Amount);
-        reserves.reserve0 += asset0Amount;
-        reserves.reserve1 += asset1Amount;
+        k = ICurve(pair.invariant).addLiquidity(reserves, token0Amount, token1Amount);
+        reserves.reserve0 += token0Amount;
+        reserves.reserve1 += token1Amount;
 
-        pair.asset0._transferERC1155(to, address(this), asset0Amount);
-        pair.asset1._transferERC1155(to, address(this), asset1Amount);
+        IERC20(pair.token0).transferFrom(to, address(this), token0Amount);
+        IERC20(pair.token1).transferFrom(to, address(this), token1Amount);
 
         _mint(to, pairId, k, "");
     }
@@ -74,70 +114,32 @@ contract Vault is AssetWrapper, ERC1155, ERC1155TokenReceiver {
         uint256 pairId = uint256(keccak256(abi.encode(pair)));
         Reserves storage reserves = pairReserves[pairId];
 
-        require(pair.asset0.token < pair.asset1.token, "asset0 > asset1");
+        require(pair.token0 < pair.token1, "token0 > token1");
         (amount0Out, amount1Out) = ICurve(pair.invariant).removeLiquidity(reserves, k);
         reserves.reserve0 -= amount0Out;
         reserves.reserve1 -= amount1Out;
 
         _burn(from, pairId, k);
-        pair.asset0._transferERC1155(address(this), from, amount0Out);
-        pair.asset1._transferERC1155(address(this), from, amount1Out);
+        IERC20(pair.token0).transfer(from, amount0Out);
+        IERC20(pair.token1).transfer(from, amount1Out);
     }
 
     function _swap(
         address to,
-        Asset calldata assetIn,
+        address tokenIn,
         uint128 amountIn,
         Pair calldata pair
-    ) internal returns (Asset memory assetOut, uint128 amountOut) {
+    ) internal returns (address tokenOut, uint128 amountOut) {
         uint256 pairId = uint256(keccak256(abi.encode(pair)));
         Reserves storage reserves = pairReserves[pairId];
-        if (assetIn.token == pair.asset0.token) {
+        if (tokenIn == pair.token0) {
             amountOut = ICurve(pair.invariant).swap(reserves.reserve0, reserves.reserve1, amountIn);
-            (reserves.reserve0 += amountIn, reserves.reserve1 -= amountOut, assetOut = pair.asset1);
-        } else if (assetIn.token == pair.asset1.token) {
+            (reserves.reserve0 += amountIn, reserves.reserve1 -= amountOut, tokenOut = pair.token1);
+        } else if (tokenIn == pair.token1) {
             amountOut = ICurve(pair.invariant).swap(reserves.reserve1, reserves.reserve0, amountIn);
-            (reserves.reserve0 -= amountOut, reserves.reserve1 += amountIn, assetOut = pair.asset0);
+            (reserves.reserve0 -= amountOut, reserves.reserve1 += amountIn, tokenOut = pair.token0);
         }
-        assetIn._transferERC1155(to, address(this), amountIn);
-        assetOut._transferERC1155(address(this), to, amountOut);
-    }
-
-    function _afterWrap(
-        address to,
-        uint256 id,
-        uint256 amount
-    ) internal override {
-        _mint(to, id, amount, "");
-    }
-
-    function _afterUnwrap(
-        address from,
-        uint256 id,
-        uint256 amount
-    ) internal override {
-        _burn(from, id, amount);
-    }
-
-    /// @notice Handles the receipt of a single ERC1155 token type
-    function onERC1155Received(
-        address,
-        address,
-        uint256,
-        uint256,
-        bytes calldata
-    ) external virtual override returns (bytes4) {
-        return ERC1155TokenReceiver.onERC1155Received.selector;
-    }
-
-    /// @notice Handles the receipt of multiple ERC1155 token types
-    function onERC1155BatchReceived(
-        address,
-        address,
-        uint256[] calldata,
-        uint256[] calldata,
-        bytes calldata
-    ) external virtual override returns (bytes4) {
-        return ERC1155TokenReceiver.onERC1155BatchReceived.selector;
+        IERC20(tokenIn).transferFrom(to, address(this), amountIn);
+        IERC20(tokenOut).transfer(to, amountOut);
     }
 }
