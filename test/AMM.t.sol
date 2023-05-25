@@ -3,18 +3,18 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
-import "../src/Vault.sol";
+import "../src/MetaAMM.sol";
 import {XtYK} from "../src/invariants/XtYK.sol";
 
-contract VaultTest is Test {
-    Vault public vault;
+contract MetaAMMTest is Test {
+    MetaAMM public amm;
     XtYK public xyk;
     MockERC20 public token0;
     MockERC20 public token1;
     uint256 public computedPairId;
 
     function setUp() public {
-        vault = new Vault();
+        amm = new MetaAMM();
         xyk = new XtYK();
         token0 = new MockERC20("", "", 18);
         token1 = new MockERC20("", "", 18);
@@ -22,8 +22,8 @@ contract VaultTest is Test {
         token0.mint(address(0xBEEF), type(uint128).max);
         token1.mint(address(0xBEEF), type(uint128).max);
         vm.startPrank(address(0xBEEF));
-        token0.approve(address(vault), type(uint256).max);
-        token1.approve(address(vault), type(uint256).max);
+        token0.approve(address(amm), type(uint256).max);
+        token1.approve(address(amm), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -41,9 +41,9 @@ contract VaultTest is Test {
         Pair memory pair = Pair(address(token0), address(token1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.addLiquidity(address(0xBEEF), 1 gwei, 1 gwei, pair);
-        assertEq(token0.balanceOf(address(vault)), 1 gwei);
-        assertEq(token1.balanceOf(address(vault)), 1 gwei);
+        amm.addLiquidity(address(0xBEEF), 1 gwei, 1 gwei, pair);
+        assertEq(token0.balanceOf(address(amm)), 1 gwei);
+        assertEq(token1.balanceOf(address(amm)), 1 gwei);
     }
 
     function testSwap() public {
@@ -52,7 +52,7 @@ contract VaultTest is Test {
         Pair memory pair = Pair(address(token0), address(token1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.swap(address(0xBEEF), address(token0), 0.5 gwei, pair);
+        amm.swap(address(0xBEEF), address(token0), 0.5 gwei, pair);
     }
 
     function testRemoveLiquidity() public {
@@ -60,6 +60,6 @@ contract VaultTest is Test {
         Pair memory pair = Pair(address(token0), address(token1), address(xyk));
 
         vm.prank(address(0xBEEF));
-        vault.removeLiquidity(address(0xBEEF), 1 gwei * 1 gwei - 1000, pair);
+        amm.removeLiquidity(address(0xBEEF), 1 gwei * 1 gwei - 1000, pair);
     }
 }
